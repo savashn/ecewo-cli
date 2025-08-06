@@ -700,6 +700,9 @@ int main(int argc, char *argv[])
         if (flags.slugify)
             install_vendor("slugify", SLUGIFY_C_URL, SLUGIFY_H_URL);
 
+        if (flags.sqlite)
+            install_vendor("sqlite", SQLITE_C_URL, SQLITE_H_URL);
+
         return 0;
     }
 
