@@ -12,7 +12,7 @@ else
     INSTALL_NAME = ecewo
 endif
  
-SRCS = src/cli.c src/select_menu.c src/utils.c src/helpers.c src/lib/cbor.c src/lib/postgres.c
+SRCS = src/cli.c src/utils/select_menu.c src/utils/utils.c src/utils/helpers.c src/lib/cbor.c src/lib/postgres.c src/lib/l8w8jwt.c
  
 all: $(TARGET) 
  

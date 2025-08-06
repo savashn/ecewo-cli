@@ -8,7 +8,7 @@ Plugin plugins[] = {
     {"slugify", SLUGIFY_C_URL, SLUGIFY_H_URL, 0},
     {"SQLite3", SQLITE_C_URL, SQLITE_H_URL, 0},
     {"Postgres", NULL, NULL, 0},
-    {"TinyCBOR", NULL, NULL, 0},
+    {"CBOR", NULL, NULL, 0},
 };
 
 const int plugin_count = sizeof(plugins) / sizeof(Plugin);
@@ -267,70 +267,41 @@ static void parse_arguments(int argc, char *argv[], flags_t *flags)
 
     for (int i = 1; i < argc; i++)
     {
+        // Project
         if (strcmp(argv[i], "run") == 0)
-        {
             flags->run = 1;
-        }
         else if (strcmp(argv[i], "create") == 0)
-        {
             flags->create = 1;
-        }
         else if (strcmp(argv[i], "rebuild") == 0)
-        {
             flags->rebuild = 1;
-        }
         else if (strcmp(argv[i], "build-prod") == 0)
-        {
             flags->build_production = 1;
-        }
         else if (strcmp(argv[i], "libs") == 0)
-        {
             flags->libs = 1;
-        }
         else if (strcmp(argv[i], "install") == 0)
-        {
             flags->install = 1;
-        }
         else if (strcmp(argv[i], "uninstall") == 0)
-        {
             flags->uninstall = 1;
-        }
+
+        // Libraries
         else if (strcmp(argv[i], "cjson") == 0)
-        {
             flags->cjson = 1;
-        }
         else if (strcmp(argv[i], "dotenv") == 0)
-        {
             flags->dotenv = 1;
-        }
         else if (strcmp(argv[i], "sqlite") == 0)
-        {
             flags->sqlite = 1;
-        }
         else if (strcmp(argv[i], "postgres") == 0)
-        {
             flags->postgres = 1;
-        }
         else if (strcmp(argv[i], "pquv") == 0)
-        {
             flags->pquv = 1;
-        }
         else if (strcmp(argv[i], "session") == 0)
-        {
             flags->session = 1;
-        }
         else if (strcmp(argv[i], "slugify") == 0)
-        {
             flags->slugify = 1;
-        }
         else if (strcmp(argv[i], "cbor") == 0)
-        {
             flags->cbor = 1;
-        }
         else
-        {
             printf("Unknown argument: %s\n", argv[i]);
-        }
     }
 }
 
@@ -448,11 +419,18 @@ static int create_project(void)
     {
         if (plugins[i].selected)
         {
-            // Specific processes only for cbor and l8w8jwt
-            if (strcmp(plugins[i].name, "cbor") == 0)
+            // Specific processes only for cbor and postgres
+            if (strcmp(plugins[i].name, "CBOR") == 0)
             {
                 printf("Handling TinyCBOR integration...\n");
                 install_cbor();
+                continue;
+            }
+
+            if (strcmp(plugins[i].name, "Postgres") == 0)
+            {
+                printf("Handling postgres integration...\n");
+                install_postgres();
                 continue;
             }
 
