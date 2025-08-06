@@ -67,8 +67,12 @@ extern const int plugin_count;
 typedef struct
 {
     int run;
+    int build;
+    int build_dev;
+    int build_prod;
     int rebuild;
-    int build_production;
+    int rebuild_dev;
+    int rebuild_prod;
     int libs;
     int install;
     int uninstall;

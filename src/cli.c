@@ -11,6 +11,12 @@ Plugin plugins[] = {
     {"CBOR", NULL, NULL, 0},
 };
 
+typedef enum
+{
+    BUILD_TYPE_DEV, // Development build
+    BUILD_TYPE_PROD // Production build
+} build_type_t;
+
 const int plugin_count = sizeof(plugins) / sizeof(Plugin);
 
 static int install_vendor(const char *plugin_name, const char *c_url, const char *h_url)
@@ -260,7 +266,7 @@ static int uninstall_vendor(const char *plugin_name)
     return 0;
 }
 
-// Parse command line arguments - no changes needed, already safe
+// Parse command line arguments
 static void parse_arguments(int argc, char *argv[], flags_t *flags)
 {
     memset(flags, 0, sizeof(flags_t));
@@ -272,16 +278,63 @@ static void parse_arguments(int argc, char *argv[], flags_t *flags)
             flags->run = 1;
         else if (strcmp(argv[i], "create") == 0)
             flags->create = 1;
-        else if (strcmp(argv[i], "rebuild") == 0)
-            flags->rebuild = 1;
-        else if (strcmp(argv[i], "build-prod") == 0)
-            flags->build_production = 1;
         else if (strcmp(argv[i], "libs") == 0)
             flags->libs = 1;
         else if (strcmp(argv[i], "install") == 0)
             flags->install = 1;
         else if (strcmp(argv[i], "uninstall") == 0)
             flags->uninstall = 1;
+        else if (strcmp(argv[i], "build") == 0)
+        {
+            flags->build = 1;
+            if (i + 1 < argc)
+            {
+                if (strcmp(argv[i + 1], "dev") == 0)
+                {
+                    flags->build_dev = 1;
+                    i++;
+                }
+                else if (strcmp(argv[i + 1], "prod") == 0)
+                {
+                    flags->build_prod = 1;
+                    i++;
+                }
+                else
+                {
+                    flags->build_dev = 1;
+                }
+            }
+            else
+            {
+                flags->build_dev = 1;
+            }
+        }
+
+        else if (strcmp(argv[i], "rebuild") == 0)
+        {
+            flags->rebuild = 1;
+            if (i + 1 < argc)
+            {
+                if (strcmp(argv[i + 1], "dev") == 0)
+                {
+                    flags->rebuild_dev = 1;
+                    i++;
+                }
+                else if (strcmp(argv[i + 1], "prod") == 0)
+                {
+                    flags->rebuild_prod = 1;
+                    i++;
+                }
+                else
+                {
+                    flags->rebuild_dev = 1;
+                }
+            }
+            else
+            {
+                flags->rebuild_dev = 1;
+            }
+        }
 
         // Libraries
         else if (strcmp(argv[i], "cjson") == 0)
@@ -455,53 +508,159 @@ static int create_project(void)
     return 0;
 }
 
-// Build and run function
-static int build_and_run(void)
+static int build_project(build_type_t build_type)
 {
-    printf("Creating build directory...\n");
-    create_directory("build");
+    const char *build_dir = "build";
+    const char *build_mode;
+    const char *cmake_build_type;
+    const char *cmake_config;
 
-    if (chdir("build") != 0)
+    switch (build_type)
     {
-        printf("Error: Cannot change to build directory\n");
+    case BUILD_TYPE_PROD:
+        build_mode = "Production";
+        cmake_build_type = "Release";
+        cmake_config = "--config Release";
+        break;
+    case BUILD_TYPE_DEV:
+    default:
+        build_mode = "Development";
+        cmake_build_type = "Debug";
+        cmake_config = "--config Debug";
+        break;
+    }
+
+    printf("Creating %s build...\n", build_mode);
+
+    if (create_directory(build_dir) != 0)
+    {
+        printf("Error creating build directory: %s\n", build_dir);
         return -1;
     }
 
-    printf("Configuring with CMake...\n");
-    if (execute_command("cmake ..") != 0)
+    if (chdir(build_dir) != 0)
+    {
+        printf("Error: Cannot change to build directory: %s\n", build_dir);
+        return -1;
+    }
+
+    printf("Configuring with CMake (%s)...\n", cmake_build_type);
+
+    size_t cmake_cmd_size = strlen("cmake -DCMAKE_BUILD_TYPE= ..") + strlen(cmake_build_type) + 1;
+    char *cmake_cmd = malloc(cmake_cmd_size);
+    if (!cmake_cmd)
+    {
+        printf("Error: Memory allocation failed\n");
+        chdir("..");
+        return -1;
+    }
+
+    snprintf(cmake_cmd, cmake_cmd_size, "cmake -DCMAKE_BUILD_TYPE=%s ..", cmake_build_type);
+
+    if (execute_command(cmake_cmd) != 0)
     {
         printf("Error: cmake configuration failed\n");
+        free(cmake_cmd);
+        chdir("..");
+        return -1;
+    }
+    free(cmake_cmd);
+
+    printf("Building (%s)...\n", cmake_build_type);
+
+    size_t build_cmd_size = strlen("cmake --build . ") + strlen(cmake_config) + 1;
+    char *build_cmd = malloc(build_cmd_size);
+    if (!build_cmd)
+    {
+        printf("Error: Memory allocation failed\n");
         chdir("..");
         return -1;
     }
 
-    printf("Building...\n");
-    if (execute_command("cmake --build .") != 0)
+    snprintf(build_cmd, build_cmd_size, "cmake --build . %s", cmake_config);
+
+    if (execute_command(build_cmd) != 0)
     {
         printf("Error: Build failed\n");
+        free(build_cmd);
         chdir("..");
         return -1;
     }
+    free(build_cmd);
 
-    printf("Build completed!\n\n");
+    printf("%s build completed successfully!\n", build_mode);
+    chdir("..");
+    return 0;
+}
+
+static int rebuild_project(build_type_t build_type)
+{
+    const char *build_dir = "build";
+    const char *build_mode;
+
+    switch (build_type)
+    {
+    case BUILD_TYPE_PROD:
+        build_mode = "Production";
+        break;
+    case BUILD_TYPE_DEV:
+    default:
+        build_mode = "Development";
+        break;
+    }
+
+    printf("Rebuilding %s build...\n", build_mode);
+
+    printf("Cleaning build directory...\n");
+    if (remove_directory(build_dir) != 0)
+    {
+        printf("Warning: Could not remove build directory (may not exist)\n");
+    }
+
+    printf("Removed build directory\n");
+    printf("\n");
+
+    return build_project(build_type);
+}
+
+static int run_project(void)
+{
+    const char *build_dir = "build";
+
+    // Check if build folder exists
+    if (!file_exists(build_dir))
+    {
+        printf("Build not found. Building development version first...\n");
+        if (build_project(BUILD_TYPE_DEV) != 0)
+        {
+            return -1;
+        }
+        printf("\n");
+    }
+
+    if (chdir(build_dir) != 0)
+    {
+        printf("Error: Cannot change to build directory: %s\n", build_dir);
+        return -1;
+    }
+
     printf("Running server...\n");
 
     // Get executable name dynamically
     chdir("..");
     char *exec_name = get_exec_name();
-    chdir("build");
+    chdir(build_dir);
 
     if (exec_name)
     {
         // Platform-specific executable path ve extension
-        size_t exec_path_size = strlen(exec_name) + 10; // Extra space for extension
+        size_t exec_path_size = strlen(exec_name) + 10;
         char *exec_path = malloc(exec_path_size);
         if (exec_path)
         {
 
 #ifdef _WIN32
-            // Windows: önce .exe ile dene
-            snprintf(exec_path, exec_path_size, "%s.exe", exec_name); // ./ kaldırıldı
+            snprintf(exec_path, exec_path_size, "%s.exe", exec_name);
             if (file_exists(exec_path))
             {
                 execute_command(exec_path);
@@ -515,12 +674,14 @@ static int build_and_run(void)
                 }
                 else
                 {
-                    printf("Executable %s not found (tried %s.exe and %s). Check for build errors.\n",
-                           exec_name, exec_name, exec_name);
+                    printf("Executable %s not found. Build may have failed.\n", exec_name);
+                    chdir("..");
+                    free(exec_path);
+                    free(exec_name);
+                    return -1;
                 }
             }
 #else
-            // Linux/macOS: ./ ile
             snprintf(exec_path, exec_path_size, "./%s", exec_name);
             if (file_exists(exec_path))
             {
@@ -528,7 +689,11 @@ static int build_and_run(void)
             }
             else
             {
-                printf("Executable %s not found. Check for build errors.\n", exec_name);
+                printf("Executable %s not found. Build may have failed.\n", exec_name);
+                chdir("..");
+                free(exec_path);
+                free(exec_name);
+                return -1;
             }
 #endif
             free(exec_path);
@@ -538,47 +703,9 @@ static int build_and_run(void)
     else
     {
         printf("Could not determine executable name. Check CMakeLists.txt.\n");
-    }
-
-    chdir("..");
-    return 0;
-}
-
-static int build_production(void)
-{
-    printf("Creating production build (Release mode)...\n");
-
-    const char *build_dir = "build-prod";
-    if (create_directory(build_dir) != 0)
-    {
-        printf("Error creating build directory\n");
-        return -1;
-    }
-
-    if (chdir(build_dir) != 0)
-    {
-        printf("Error: Cannot change to build directory\n");
-        return -1;
-    }
-
-    printf("Configuring with CMake (Release)...\n");
-    if (execute_command("cmake -DCMAKE_BUILD_TYPE=Release ..") != 0)
-    {
-        printf("Error: cmake configuration failed\n");
         chdir("..");
         return -1;
     }
-
-    printf("Building (Release)...\n");
-    if (execute_command("cmake --build . --config Release") != 0)
-    {
-        printf("Error: Build failed\n");
-        chdir("..");
-        return -1;
-    }
-
-    printf("Production build completed!\n");
-    printf("Optimized binary location: %s/\n", build_dir);
 
     chdir("..");
     return 0;
@@ -593,7 +720,7 @@ int main(int argc, char *argv[])
     parse_arguments(argc, argv, &flags);
 
     // Check if no parameters were provided
-    if ((!flags.create && !flags.run && !flags.rebuild && !flags.build_production && !flags.libs && !flags.install && !flags.uninstall) || (flags.help))
+    if ((!flags.create && !flags.run && !flags.build && !flags.rebuild && !flags.libs && !flags.install && !flags.uninstall) || (flags.help))
     {
         show_help();
         return 0;
@@ -608,21 +735,31 @@ int main(int argc, char *argv[])
     // Handle run command
     if (flags.run)
     {
-        return build_and_run();
+        return run_project();
     }
 
-    // Handle rebuild command
+    if (flags.build)
+    {
+        if (flags.build_prod)
+        {
+            return build_project(BUILD_TYPE_PROD);
+        }
+        else // build_dev or default
+        {
+            return build_project(BUILD_TYPE_DEV);
+        }
+    }
+
     if (flags.rebuild)
     {
-        printf("Cleaning build directory...\n");
-        remove_directory("build");
-        printf("Rebuilding...\n\n");
-        return build_and_run();
-    }
-
-    if (flags.build_production)
-    {
-        return build_production();
+        if (flags.rebuild_prod)
+        {
+            return rebuild_project(BUILD_TYPE_PROD);
+        }
+        else // rebuild_dev or default
+        {
+            return rebuild_project(BUILD_TYPE_DEV);
+        }
     }
 
     if (flags.libs)
