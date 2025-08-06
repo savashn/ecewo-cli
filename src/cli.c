@@ -800,7 +800,7 @@ int main(int argc, char *argv[])
             uninstall_vendor("slugify");
 
         if (flags.sqlite)
-            uninstall_vendor("sqlite");
+            uninstall_vendor("SQLite3");
 
         return 0;
     }
