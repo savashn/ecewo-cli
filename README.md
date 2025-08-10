@@ -14,16 +14,10 @@ To build and add to path:
 make install
 ```
 
-To uninstall from path
+To clean and uninstall from path
 
 ```
 make uninstall
-```
-
-To cleanup:
-
-```
-make clean
 ```
 
 > [!WARNING]

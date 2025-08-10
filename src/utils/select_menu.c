@@ -1,5 +1,25 @@
 #include "cli.h"
 
+// POSIX terminal raw mode
+#ifndef _WIN32
+static struct termios orig_term;
+
+static void enable_raw_mode()
+{
+    struct termios raw;
+    if (tcgetattr(STDIN_FILENO, &orig_term) == -1)
+        return;
+    raw = orig_term;
+    raw.c_lflag &= ~(ECHO | ICANON);
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+}
+
+static void disable_raw_mode()
+{
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_term);
+}
+#endif
+
 // Clear the console screen
 void clear_screen(void)
 {

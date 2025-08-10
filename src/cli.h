@@ -19,22 +19,6 @@
 #include <termios.h>
 #define PATH_SEPARATOR "/"
 #define system_command(cmd) system(cmd)
-
-// POSIX terminal raw mode
-static struct termios orig_term;
-void enable_raw_mode()
-{
-    struct termios raw;
-    if (tcgetattr(STDIN_FILENO, &orig_term) == -1)
-        return;
-    raw = orig_term;
-    raw.c_lflag &= ~(ECHO | ICANON);
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
-}
-void disable_raw_mode()
-{
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_term);
-}
 #endif
 
 #define REPO_URL "https://github.com/savashn/ecewo"
