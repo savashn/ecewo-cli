@@ -266,7 +266,6 @@ static int uninstall_vendor(const char *plugin_name)
     return 0;
 }
 
-// Parse command line arguments
 static void parse_arguments(int argc, char *argv[], flags_t *flags)
 {
     memset(flags, 0, sizeof(flags_t));
@@ -409,12 +408,12 @@ static int create_project(void)
         "#include \"server.h\"\n"
         "#include \"ecewo.h\"\n"
         "\n"
-        "void destroy_app()\n"
+        "void destroy_app(void)\n"
         "{\n"
         "   reset_router();\n"
         "}\n"
         "\n"
-        "int main()\n"
+        "int main(void)\n"
         "{\n"
         "   init_router();\n"
         "   shutdown_hook(destroy_app);\n"
@@ -544,27 +543,36 @@ static int build_project(build_type_t build_type)
         return -1;
     }
 
-    printf("Configuring with CMake (%s)...\n", cmake_build_type);
-
-    size_t cmake_cmd_size = strlen("cmake -DCMAKE_BUILD_TYPE= ..") + strlen(cmake_build_type) + 1;
-    char *cmake_cmd = malloc(cmake_cmd_size);
-    if (!cmake_cmd)
+    int cache_exists = file_exists("CMakeCache.txt");
+    
+    if (!cache_exists)
     {
-        printf("Error: Memory allocation failed\n");
-        chdir("..");
-        return -1;
-    }
+        printf("Configuring with CMake (%s)...\n", cmake_build_type);
 
-    snprintf(cmake_cmd, cmake_cmd_size, "cmake -DCMAKE_BUILD_TYPE=%s ..", cmake_build_type);
+        size_t cmake_cmd_size = strlen("cmake -DCMAKE_BUILD_TYPE= ..") + strlen(cmake_build_type) + 1;
+        char *cmake_cmd = malloc(cmake_cmd_size);
+        if (!cmake_cmd)
+        {
+            printf("Error: Memory allocation failed\n");
+            chdir("..");
+            return -1;
+        }
 
-    if (execute_command(cmake_cmd) != 0)
-    {
-        printf("Error: cmake configuration failed\n");
+        snprintf(cmake_cmd, cmake_cmd_size, "cmake -DCMAKE_BUILD_TYPE=%s ..", cmake_build_type);
+
+        if (execute_command(cmake_cmd) != 0)
+        {
+            printf("Error: cmake configuration failed\n");
+            free(cmake_cmd);
+            chdir("..");
+            return -1;
+        }
         free(cmake_cmd);
-        chdir("..");
-        return -1;
     }
-    free(cmake_cmd);
+    else
+    {
+        printf("Using existing CMake cache...\n");
+    }
 
     printf("Building (%s)...\n", cmake_build_type);
 
